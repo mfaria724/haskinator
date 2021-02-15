@@ -34,7 +34,36 @@ ramificar a b c = Pregunta c (fromList (zipWith (\x -> \y -> (x,y)) a b))
 
 -- Read con casting
 readOraculo :: String -> Oraculo
-readOraculo x = read x :: Oraculo
+readOraculo x = read x :: Oraculo 
+
+-- Funciones extra
+-- Funcion para obtener todas las predicciones de un oraculo
+obtenerPreds :: Oraculo -> [String]
+obtenerPreds (Prediccion x) = [x]
+obtenerPreds (Pregunta _ x) = desdeOpciones (obtenerOraculos x)
+  where
+    second (a, b) = b
+    obtenerOraculos x = Prelude.map second (toList x)
+    desdeOpciones [] = []
+    desdeOpciones (x:xs) = (obtenerPreds x) ++ (desdeOpciones xs)
+
+-- Funcion para obtener todas las predicciones de una lista de oraculos
+obtenerPredsOraculos :: [Oraculo] -> [String]
+obtenerPredsOraculos [] = []
+obtenerPredsOraculos (x:xs) = (obtenerPredicciones x) ++ (obtenerPredsOraculos xs)
+
+-- Funcion para verificar si todos los elementos de una lista son distintos.
+distintos :: Eq a => [a] -> Bool
+distintos [] = True
+distintos [x] = True
+distintos (x:xs) 
+  | elem x xs = False
+  | otherwise = distintos xs
+
+-- Funcion para verificar si una lista de oraculos es correcta.
+verificarPreds :: [Oraculo] -> Bool
+verificarPreds x = distintos $ obtenerPredsOraculos x 
+
 
 oraculoTest = crearOraculo "Eres de Guarico"
 opcionesTest = fromList [
@@ -49,7 +78,7 @@ oraculosNivel3 = [
 
 oraculosNivel2 = [
   ramificar ["Suicide Squad", "The Dark Knight"] oraculosNivel3 "De que pelicula es el Joker?",
-  crearOraculo "Tom Hardy",
+  crearOraculo "Jared Leto",
   crearOraculo "Cillian Murphy"
   ]
 
