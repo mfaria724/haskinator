@@ -1,100 +1,65 @@
-module Oraculo where
+module Oraculo (
+  Opciones, 
+  Oraculo (Prediccion, Pregunta),
+  crearOraculo, 
+  prediccion, 
+  pregunta, 
+  opciones, 
+  respuesta, 
+  ramificar, 
+  readOraculo
+) where
 
-import Data.Map 
-import Data.String
-import Data.Maybe
-import Text.Read
+import Data.Map (Map, fromList, lookup) 
+import Data.Maybe (fromJust)
 
--- Definiciones de Tipos
+{- DEFINICIONES DE TIPOS -}
 type Opciones = Map String Oraculo
 data Oraculo = Prediccion String 
-             | Pregunta String Opciones 
-             deriving(Show, Read)
+            | Pregunta String Opciones 
+            deriving(Show, Read)
 
--- Funciones de construcción
+
+{- FUNCIONES DE CONSTRUCCION -}
+-- Recibe una cadena de caracteres y devuelve un oraculo que consiste 
+-- unicamente de la cadena suministrada como prediccion.
 crearOraculo :: String -> Oraculo
 crearOraculo a = Prediccion a 
 
--- Funciones de acceso
+
+{- FUNCIONES DE ACCESO -}
+-- Recibe un oraculo y devuelve la cadena de caracteres asociada si el mismo es
+-- una prediccion (arroja un error de lo contrario).
 prediccion :: Oraculo -> String
 prediccion (Prediccion a) = a 
 
+-- Recibe un oraculo y devuelve la cadena de caracteres asociada si el mismo es una 
+-- pregunta (arroja un error de lo contrario).
 pregunta :: Oraculo -> String
 pregunta (Pregunta a _) = a
 
+-- Recibe un oraculo y devuelve la lista de opciones asociadas si el mismo es una 
+-- pregunta (arroja un error de lo contrario).
 opciones :: Oraculo -> Opciones
 opciones (Pregunta _ b) = b
 
+-- Recibe un oraculo y una cadena de caracteres S, y devuelve el oraculo que 
+-- corresponde a la respuesta asociada a la opcion S; esto, si el mismo es una 
+-- pregunta (arroja un error de lo contrario).
 respuesta :: Oraculo -> String -> Oraculo
-respuesta (Pregunta a b) c = fromJust (Data.Map.lookup c b)  
+respuesta (Pregunta _ b) c = fromJust (Data.Map.lookup c b)  
 
--- Funciones de modificación
+
+{- FUNCIONES DE MODIFICACION -}
+-- Recibe un lista de cadenas de caracteres (representando opciones a una pregunta),
+-- una lista de oraculos y una cadena de caracteres (representando una pregunta). 
+-- Devuelve un or ́aculo, de tipo pregunta, con la cadena suministrada y las opciones 
+-- construidas.
 ramificar :: [String] -> [Oraculo] -> String -> Oraculo
 ramificar a b c = Pregunta c (fromList (zipWith (\x -> \y -> (x,y)) a b))
 
--- Read con casting
+
+{- FUNCIONES DE LECTURA/ESCRITURA -}
+-- Lee un string y los convierte al tipo Oraculo.
 readOraculo :: String -> Oraculo
 readOraculo x = read x :: Oraculo 
-
--- Funciones extra
--- Funcion para obtener todas las predicciones de un oraculo
-obtenerPreds :: Oraculo -> [String]
-obtenerPreds (Prediccion x) = [x]
-obtenerPreds (Pregunta _ x) = desdeOpciones (obtenerOraculos x)
-  where
-    second (a, b) = b
-    obtenerOraculos x = Prelude.map second (toList x)
-    desdeOpciones [] = []
-    desdeOpciones (x:xs) = (obtenerPreds x) ++ (desdeOpciones xs)
-
--- Funcion para obtener todas las predicciones de una lista de oraculos
-obtenerPredsOraculos :: [Oraculo] -> [String]
-obtenerPredsOraculos [] = []
-obtenerPredsOraculos (x:xs) = (obtenerPreds x) ++ (obtenerPredsOraculos xs)
-
--- Funcion para verificar si todos los elementos de una lista son distintos.
-distintos :: Eq a => [a] -> Bool
-distintos [] = True
-distintos [x] = True
-distintos (x:xs) 
-  | elem x xs = False
-  | otherwise = distintos xs
-
--- Funcion para verificar si una lista de oraculos es correcta.
-verificarPreds :: [Oraculo] -> Bool
-verificarPreds x = distintos $ obtenerPredsOraculos x 
-
-
-oraculoTest = crearOraculo "Eres de Guarico"
-opcionesTest = fromList [
-  ("Si", oraculoTest), 
-  ("No", crearOraculo "Eres de Caracas")
-  ]
-
-oraculosNivel3 = [
-  crearOraculo "Jared Leto",
-  crearOraculo "Heath Ledger"
-  ]
-
-oraculosNivel2 = [
-  ramificar ["Suicide Squad", "The Dark Knight"] oraculosNivel3 "De que pelicula es el Joker?",
-  crearOraculo "Jared Leto",
-  crearOraculo "Cillian Murphy"
-  ]
-
-oraculosNivel1 = [
-  ramificar ["Joker", "Bane", "Scarecrow"] oraculosNivel2 "Cual es el nombre del villano?",
-  crearOraculo "Christian Bale"
-  ]
-
-oraculoEnunciado = ramificar ["Si", "No"] oraculosNivel1 "El actor interpreto un villano?"
-oraculoConOpciones = Pregunta "Te gusta el queso?" opcionesTest
-
-opcionesRamificar = ["Suicide Squad", "The Dark Knight"]
-oraculosRamificar = [
-  crearOraculo "Jared Leto",
-  crearOraculo "Heath Ledger"
-  ]
-
-a = ramificar opcionesRamificar oraculosRamificar "Que palicula?"
-p = show oraculoConOpciones
