@@ -1,0 +1,1 @@
+Pregunta "El actor interpreto un villano?" (fromList [("No",Prediccion "Christian Bale"),("Si",Pregunta "Cual es el nombre del villano?" (fromList [("Bane",Prediccion "Jared Leto"),("Joker",Pregunta "De que pelicula es el Joker?" (fromList [("Suicide Squad",Prediccion "Jared Leto"),("The Dark Knight",Prediccion "Heath Ledger")])),("Scarecrow",Prediccion "Cillian Murphy")]))])

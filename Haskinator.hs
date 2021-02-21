@@ -3,19 +3,28 @@ import System.IO
 import Data.Maybe
 import Data.List
 
+dfs oraculo [] = 
+dfs oraculo (x:xs) = 
+
+prompt :: String -> IO String
+prompt text = do
+    putStr text
+    getLine
+
 consultarPreguntaCrucial :: Maybe Oraculo -> IO ()
 -- Chequear cuando el oraculo es Nothing
 consultarPreguntaCrucial oraculo =
-  do putStrLn "Por favor, ingrese la primera predicción:"
-     pred1 <- getLine
-     putStrLn "Por favor, ingrese la segunda predicción:"
-     pred2 <- getLine
-
+  do pred1 <- prompt "Por favor, ingrese la primera predicción:\n"
+     pred2 <- prompt "Por favor, ingrese la segunda predicción:\n"
+     let predsOrcaulo = obtenerPreds (fromJust oraculo)
+     if (and [elem pred1 predsOrcaulo, elem pred2 predsOrcaulo])
+       then do putStrLn "Obtener ancestro"
+       else do putStrLn "Su consulta es inválida"
+     main' oraculo
 
 cargarOraculo :: IO ()
 cargarOraculo =
-  do putStrLn "\nIndique el nombre del archivo de entrada:\n" 
-     fileName <- getLine
+  do fileName <- prompt "\nIndique el nombre del archivo de entrada:\n" 
      file <- openFile fileName ReadMode
      putStrLn ""
      textoOraculo <- hGetLine file
@@ -23,13 +32,13 @@ cargarOraculo =
      putStrLn "El Oraculo ha sido cargado con éxito!"
      main' (Just oraculo)
 
+persistirOraculo :: Maybe Oraculo -> IO ()
 persistirOraculo oraculo
   | isNothing oraculo = 
       do putStrLn "\nNo se ha cargado en memoria ningún oraculo.\n"
          main' Nothing
   | otherwise =
-      do putStrLn "\nIndique el nombre del archivo de salida:\n" 
-         fileName <- getLine
+      do fileName <- prompt "\nIndique el nombre del archivo de salida:\n" 
          file <- openFile fileName WriteMode
          putStrLn ""
          hPutStrLn file (show $ fromJust oraculo)
@@ -37,8 +46,7 @@ persistirOraculo oraculo
          main' oraculo
 
 crearNuevoOraculo :: IO ()
-crearNuevoOraculo = do putStrLn "\nIndique la predicción del Oraculo a ser creado:"
-                       pred <- getLine
+crearNuevoOraculo = do pred <- prompt "\nIndique la predicción del Oraculo a ser creado:\n"
                        main' (Just $ crearOraculo pred) 
 
 iniciaFuncion :: Maybe Oraculo -> Char -> IO ()
@@ -48,7 +56,7 @@ iniciaFuncion oraculo op
                    putStrLn (show oraculoEnunciado)
   | op == '3' = do persistirOraculo oraculo
   | op == '4' = do cargarOraculo
-  | op == '5' = do putStrLn "Opcion 5"
+  | op == '5' = do consultarPreguntaCrucial oraculo
   | op == '6' = do putStrLn (show oraculo)
                    main' oraculo
   | otherwise = do putStrLn "Hasta la proxima!" 
@@ -69,7 +77,9 @@ main' oraculo =
        else do iniciaFuncion oraculo opcion      
 
 main :: IO ()
-main = do putStrLn "#########################"
+main = do hSetBuffering stdout NoBuffering
+          hSetBuffering stdin NoBuffering
+          putStrLn "#########################"
           putStrLn "¡Bienvenido a Haskinator!"
           putStrLn "#########################\n"
           main' Nothing

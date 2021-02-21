@@ -50,7 +50,7 @@ obtenerPreds (Pregunta _ x) = desdeOpciones (obtenerOraculos x)
 -- Funcion para obtener todas las predicciones de una lista de oraculos
 obtenerPredsOraculos :: [Oraculo] -> [String]
 obtenerPredsOraculos [] = []
-obtenerPredsOraculos (x:xs) = (obtenerPredicciones x) ++ (obtenerPredsOraculos xs)
+obtenerPredsOraculos (x:xs) = (obtenerPreds x) ++ (obtenerPredsOraculos xs)
 
 -- Funcion para verificar si todos los elementos de una lista son distintos.
 distintos :: Eq a => [a] -> Bool
