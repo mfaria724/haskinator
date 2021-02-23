@@ -4,13 +4,9 @@ import Data.Maybe (fromJust, isNothing)
 import Data.Map (fromList, toList) 
 
 {- FUNCIONES PARA VERIFICAR LA CORRECTITUD DE UN ORACULO -}
--- Retorna el segundo elemento de una tupla de dos elementos.
-second :: (a, b) -> b 
-second (_, y) = y
-
 -- Recibe unas opciones y retorna todos los oraculos asociados.
 obtenerOraculos :: Opciones -> [Oraculo]
-obtenerOraculos x = Prelude.map second (toList x)
+obtenerOraculos x = Prelude.map snd (toList x)
 
 -- Recibe un oraculo y retorna todas las predicciones que aparecen
 -- a partir de el.
@@ -77,10 +73,11 @@ putError text =
 -- Imprime un procedimiento exitoso
 putSuccess :: String -> IO ()
 putSuccess text = 
-  do clear
-     verde; putStr "*** "; normal; negrita
-     putStr text
-     verde; putStr " ***\n\n"; normal
+  do 
+    clear
+    verde; putStr "*** "; normal; negrita
+    putStr text
+    verde; putStr " ***\n\n"; normal
 
 
 {- FUNCIONES DE CREACION -}
@@ -92,6 +89,57 @@ crearNuevoOraculo =
 
 
 {- FUNCIONES DE PREDICCION -}
+-- Obtiene una lista con todas las posibles respuestas a una pregunta
+obtenerRespuestas :: Opciones -> [String]
+obtenerRespuestas x = Prelude.map fst (toList x)
+
+-- Imprime las opciones disponibles para una pregunta como una lista
+-- para que sea legible para el usuario.
+printOpciones :: [String] -> IO ()  
+printOpciones [] = putStrLn "* Ninguna de las anteriores"
+printOpciones (x:xs) = 
+  do
+    putStrLn ("* " ++ x)
+    printOpciones xs
+
+agregarOpcion :: String -> String -> String -> Oraculo -> Oraculo
+agregarOpcion pregunta opcion prediccion  (Prediccion texto) = (Prediccion texto)
+agregarOpcion pregunta opcion prediccion  (Pregunta texto ops)
+  | texto == pregunta = ramificar nuevasOpciones nuevosOraculos pregunta
+  | otherwise = ramificar (obtenerRespuestas ops) opcionesSigNivel texto
+  where 
+    nuevasOpciones = obtenerRespuestas ops ++ [opcion]
+    nuevosOraculos = obtenerOraculos ops ++ [crearOraculo prediccion]
+    opcionesSigNivel = map (agregarOpcion pregunta opcion prediccion) (obtenerOraculos ops)
+
+
+-- Ejecuta el proceso de predicción hasta que llega a una de las hojas del
+-- arbol o hasta que el usuario contesta ninguna de las anteriores.
+mainPrediccion :: Oraculo -> Oraculo -> IO ()
+mainPrediccion (Prediccion texto) mainOraculo = 
+  do 
+    putStrLn ("Usted está pensando en: " ++ texto ++ "\n")
+    respuesta <- prompt "¿Es esto correcto? (Si o No)\n"
+    if respuesta == "Si"
+      then
+        putSuccess "Los humanos son demasiado predecibles..."
+      else
+        putStrLn "Como que no mmgvo? Estas en drogas?"
+mainPrediccion (Pregunta texto opciones) mainOraculo = 
+  do
+    putStrLn (texto ++ "\n")
+    let opcionesStr = obtenerRespuestas opciones 
+    printOpciones opcionesStr 
+    input <- prompt "Ingrese una de las opciones:\n"
+    let oraculo = (Pregunta texto opciones)
+    if elem input opcionesStr 
+      then
+        do
+          mainPrediccion (respuesta oraculo input) mainOraculo
+      else
+        do
+          putError "Por favor, seleccione una opcion correcta."
+          mainPrediccion oraculo mainOraculo
 
 
 {- FUNCIONES DE PERSISTENCIA -}
@@ -104,6 +152,7 @@ persistirOraculo oraculo
       do fileName <- prompt "\nIndique el nombre del archivo de salida:\n" 
          file <- openFile fileName WriteMode
          hPutStrLn file (show $ fromJust oraculo)
+         hClose file
          putSuccess "El Oraculo ha sido guardo con éxito"
          main' oraculo
 
@@ -116,13 +165,39 @@ cargarOraculo =
      putStrLn ""
      textoOraculo <- hGetLine file
      let oraculo = readOraculo textoOraculo
+     hClose file
      putSuccess "El Oraculo ha sido cargado con éxito"
      main' (Just oraculo)
 
 
 {- FUNCIONES DE CONSULTA DE PREGUNTA CRUCIAL -}
--- dfs oraculo [] = 
--- dfs oraculo (x:xs) = 
+-- Ejecuta un recorrido DFS en el oraculo y devuelve una lista con el camino
+-- hasta el nodo buscado.
+dfs :: Oraculo -> String -> Maybe [String]
+dfs (Prediccion texto) a
+  | a == texto = Just [a]
+  | otherwise = Nothing
+dfs (Pregunta texto opciones) a = dfs' (toList opciones) a [texto]
+
+-- Funcion auxiliar de dfs, para desarmar el nodo cuando es una pregunta
+-- y poder bifurcar hacia cada una de las opciones
+dfs' :: [(String, Oraculo)] -> String -> [String] -> Maybe [String]
+dfs' [] a r = Nothing
+dfs' ((x1,x2):xs) a r 
+  | r' == Nothing = dfs' xs a r
+  | otherwise = Just (r ++ [x1] ++ (fromJust r'))
+  where 
+    r' = dfs x2 a
+
+-- Copara el resultado de dos caminos creados por el dfs y retorna la pregunta 
+-- donde ambos se bifurcan.
+obtenerPuntoInflexion :: [String] -> [String] -> String -> Maybe String
+obtenerPuntoInflexion [] _ _ = Nothing
+obtenerPuntoInflexion _ [] _ = Nothing
+obtenerPuntoInflexion (x:xs) (y:ys) r
+  | x == y = obtenerPuntoInflexion xs ys x
+  | otherwise = Just r
+
 
 consultarPreguntaCrucial :: Maybe Oraculo -> IO ()
 -- Chequear cuando el oraculo es Nothing
@@ -131,8 +206,13 @@ consultarPreguntaCrucial oraculo =
      pred2 <- prompt "Por favor, ingrese la segunda predicción:\n"
      let predsOrcaulo = obtenerPreds (fromJust oraculo)
      if (and [elem pred1 predsOrcaulo, elem pred2 predsOrcaulo])
-       then do putStrLn "Obtener ancestro"
-       else do putStrLn "Su consulta es inválida"
+       then do 
+         let l1 = dfs (fromJust oraculo) pred1
+         let l2 = dfs (fromJust oraculo) pred2
+         let ancestro = obtenerPuntoInflexion (fromJust l1) (fromJust l2) ""
+         putSuccess ("La pregunta crucial es: " ++ (fromJust ancestro))
+       else do 
+         putError "Su consulta es inválida"
      main' oraculo
 
 
@@ -140,8 +220,7 @@ consultarPreguntaCrucial oraculo =
 iniciaFuncion :: Maybe Oraculo -> Char -> IO ()
 iniciaFuncion oraculo op
   | op == '1' = do crearNuevoOraculo
-  | op == '2' = do putStrLn "Opcion 2"
-                   putStrLn (show oraculoEnunciado)
+  | op == '2' = do mainPrediccion (fromJust oraculo) (fromJust oraculo)
   | op == '3' = do persistirOraculo oraculo
   | op == '4' = do cargarOraculo
   | op == '5' = do consultarPreguntaCrucial oraculo
@@ -174,15 +253,16 @@ main' oraculo =
 
 main :: IO ()
 main = 
-  do hSetBuffering stdout NoBuffering
-     hSetBuffering stdin NoBuffering
-     clear
-     negrita
-     putStrLn "#########################"
-     putStrLn "¡Bienvenido a Haskinator!"
-     putStrLn "#########################\n"
-     normal
-     main' Nothing  
+  do 
+    hSetBuffering stdout NoBuffering
+    hSetBuffering stdin NoBuffering
+    clear
+    negrita
+    putStrLn "#########################"
+    putStrLn "¡Bienvenido a Haskinator!"
+    putStrLn "#########################\n"
+    normal
+    main' Nothing  
 
 
 {- BORRAR -}
