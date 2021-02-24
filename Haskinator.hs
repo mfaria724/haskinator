@@ -148,7 +148,70 @@ obtenerNuevaPred pregunta oraculo opciones =
         putSuccess "Oraculo actualizado correctamente!"
         let oraculo' = agregarOpcion pregunta opcion prediccion oraculo
         main' $ Just oraculo'
-    
+
+-- Sustituye un nodo de Prediccion por una nueva pregunta 
+agregarPregunta :: Oraculo -> String -> Oraculo -> Oraculo
+agregarPregunta nuevoNodo prediccionIncorrecta (Prediccion texto)
+  | texto /= prediccionIncorrecta = (Prediccion texto)
+  | otherwise = nuevoNodo
+agregarPregunta nuevoNodo prediccionIncorrecta (Pregunta texto ops) =
+  ramificar (obtenerRespuestas ops) sigNivel texto
+  where
+    sigNivel = map (agregarPregunta nuevoNodo prediccionIncorrecta) (obtenerOraculos ops)
+
+-- Crea un nuevo oraculo con las opciones y predicciones suministradas por el 
+-- usuario
+pedirOpciones :: Oraculo -> String -> String -> String -> IO ()
+pedirOpciones mainOraculo prediccionIncorrecta nuevaPregunta respuestaCorrecta = 
+  do
+    opcionCorrecta <- prompt "¿Cuál opción lo llevaría a la respuesta correcta?: "
+    opcionIncorrecta <- prompt "¿Cuál opción lo llevaría a la respuesta incorrecta?: "
+    if opcionCorrecta == opcionIncorrecta 
+      then do
+        putError "Las opciones deben ser distintas."
+        pedirOpciones mainOraculo prediccionIncorrecta nuevaPregunta respuestaCorrecta
+      else do
+        -- Si las opciones no son iguales, crea el nuevo nodo como un oraculo
+        -- con las opciones suministradas.
+        putStr "Reconstruir el oraculo"
+        let opciones = [opcionCorrecta, opcionIncorrecta] 
+        let oraculos = [crearOraculo respuestaCorrecta, crearOraculo prediccionIncorrecta]
+        let nuevoNodo = ramificar opciones oraculos nuevaPregunta
+        let nuevoOraculo = agregarPregunta nuevoNodo prediccionIncorrecta mainOraculo
+        putSuccess "Oraculo actualizado correctamente"
+        main' (Just nuevoOraculo)
+
+-- Obtiene la pregunta para la creación de un nuevo nodo de pregunta
+pedirPregunta :: Oraculo -> String -> String -> IO ()
+pedirPregunta mainOraculo prediccionIncorrecta respuestaCorrecta = 
+  do
+    nuevaPregunta <- prompt "¿Cuál pregunta podría ayudar a diferenciar esta opción?: "
+    if elem nuevaPregunta (obtenerPregs mainOraculo)
+      then do
+        putError "Ya existe esta pregunta en el oraculo actual"
+        pedirPregunta mainOraculo prediccionIncorrecta respuestaCorrecta
+  
+      else do
+        -- Si la respuesta es valida pide las opciones para ella 
+        pedirOpciones mainOraculo prediccionIncorrecta nuevaPregunta respuestaCorrecta
+
+-- Inicia el proceso de creación de un nuevo nodo para incrementar el arbol
+-- de conocimiento del oraculo.
+obtenerNuevaPreg :: Oraculo -> String -> IO ()
+obtenerNuevaPreg mainOraculo prediccionIncorrecta = 
+  do
+    respuestaCorrecta <- prompt "¿Cuál sería la respuesta correcta?: "
+    -- revisar que no exista el nodo
+    if elem respuestaCorrecta (obtenerPreds mainOraculo)
+      then do
+        putError "Esa predicción ya es alcanzable usando el oraculo actual."
+        main' (Just mainOraculo)
+      
+      else do
+        -- Si la prediccion no existe en el oraculo, crea un nuevo nodo de 
+        -- pregunta.
+        pedirPregunta mainOraculo prediccionIncorrecta respuestaCorrecta
+
 -- Ejecuta el proceso de predicción hasta que llega a una de las hojas del
 -- arbol o hasta que el usuario contesta ninguna de las anteriores.
 mainPrediccion :: Oraculo -> Oraculo -> IO ()
@@ -164,7 +227,9 @@ mainPrediccion (Prediccion texto) mainOraculo =
         putSuccess "Los humanos son demasiado predecibles..."
         main' $ Just mainOraculo
       else do
-        putStrLn "Como que no mmgvo? Estas en drogas?"
+        putStrLn "Por favor, ayúdanos a mejorar Haskinator!"
+        obtenerNuevaPreg mainOraculo texto
+           
 -- Si llegamos a una pregunta, pedimos una opcion al usuario.
 mainPrediccion (Pregunta texto opciones) mainOraculo = 
   do
@@ -261,8 +326,8 @@ obtenerPuntoInflexion (x:xs) (y:ys) r
   | x == y = obtenerPuntoInflexion xs ys x
   | otherwise = Just r
 
-consultarPreguntaCrucial :: Maybe Oraculo -> IO ()
 -- Chequear cuando el oraculo es Nothing
+consultarPreguntaCrucial :: Maybe Oraculo -> IO ()
 consultarPreguntaCrucial oraculo =
   do pred1 <- prompt "Por favor, ingrese la primera predicción:\n"
      pred2 <- prompt "Por favor, ingrese la segunda predicción:\n"
@@ -302,8 +367,6 @@ iniciaFuncion oraculo op
         main' oraculo
       else do 
         consultarPreguntaCrucial oraculo
-  | op == '6' = do putStrLn (show oraculo)
-                   main' oraculo
   | otherwise = do putStrLn "\nHasta la proxima!" 
 
 -- Verifica si un caracter esta en un string.
@@ -313,6 +376,7 @@ verificarOpcion op (x:xs)
   | op == x = True
   | otherwise = verificarOpcion op xs  
 
+-- Inicia ciclo de entrada del usuario
 main' :: Maybe Oraculo -> IO ()
 main' oraculo = 
   do putStrLn "Por favor, selecciona una de las siguientes opciones:\n"
@@ -324,11 +388,12 @@ main' oraculo =
      putStrLn "6. Salir"
      opcion <- getChar
      putStr "\n"
-     if (not (verificarOpcion opcion ['1'..'7']))
+     if (not (verificarOpcion opcion ['1'..'6']))
        then do putError "Opción inválida."
                main' oraculo
        else do iniciaFuncion oraculo opcion      
 
+-- Inicia el ciclo de IO con un mensaje de bienvenida
 main :: IO ()
 main = 
   do 
@@ -341,29 +406,3 @@ main =
     putStrLn "#########################\n"
     normal
     main' Nothing  
-
-
-{- BORRAR -}
-oraculoTest = crearOraculo "Eres de Guarico"
-opcionesTest = fromList [
-  ("Si", oraculoTest), 
-  ("No", crearOraculo "Eres de Caracas")
-  ]
-
-oraculosNivel3 = [
-  crearOraculo "Jared Leto",
-  crearOraculo "Heath Ledger"
-  ]
-
-oraculosNivel2 = [
-  ramificar ["Suicide Squad", "The Dark Knight"] oraculosNivel3 "De que pelicula es el Joker?",
-  crearOraculo "Tom Hardy",
-  crearOraculo "Cillian Murphy"
-  ]
-
-oraculosNivel1 = [
-  ramificar ["Joker", "Bane", "Scarecrow"] oraculosNivel2 "Cual es el nombre del villano?",
-  crearOraculo "Christian Bale"
-  ]
-
-oraculoEnunciado = ramificar ["Si", "No"] oraculosNivel1 "El actor interpreto un villano?"
